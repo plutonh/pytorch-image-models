@@ -366,6 +366,16 @@ def build_model_with_cfg(
         pretrained: bool,
         pretrained_cfg: Optional[Dict] = None,
         pretrained_cfg_overlay: Optional[Dict] = None,
+        
+        # Edited ### proposed training configuration #################
+        proposed: bool = False,
+        version: str = 'v1',
+        mode: str = 's',
+        type: str = 'small',
+        kind: str = 'AE',
+        ratio: str = '050',
+        ##############################################################
+        
         model_cfg: Optional[Any] = None,
         feature_cfg: Optional[Dict] = None,
         pretrained_strict: bool = True,
@@ -423,7 +433,10 @@ def build_model_with_cfg(
     if model_cfg is None:
         model = model_cls(**kwargs)
     else:
-        model = model_cls(cfg=model_cfg, **kwargs)
+        # Edited ### Transfer the proposed training configuration to the model ##########
+        model = model_cls(cfg=model_cfg, proposed=proposed, 
+                          version=version, mode=mode, type=type, kind=kind, ratio=ratio, **kwargs)
+        #################################################################################
     model.pretrained_cfg = pretrained_cfg
     model.default_cfg = model.pretrained_cfg  # alias for backwards compat
 

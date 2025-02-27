@@ -84,6 +84,26 @@ def _mobilevitv2_cfg(multiplier=1.0):
     )
     return cfg
 
+# Edited ### Proposed Models ##################################################################
+def _ae_mobilevitv2_cfg(multiplier=1.0):
+    chs = (64, 128, 256, 384, 512)
+    if multiplier != 1.0:
+        chs = tuple([int(c * multiplier) for c in chs])
+    cfg = ByoModelCfg(
+        blocks=(
+            _mobilevitv2_block(d=1, c=chs[2], s=2, transformer_depth=2),
+            _mobilevitv2_block(d=1, c=chs[3], s=2, transformer_depth=4),
+            _mobilevitv2_block(d=1, c=chs[4], s=2, transformer_depth=3),
+        ),
+        stem_chs=int(32 * multiplier),
+        stem_type='3x3',
+        stem_pool='',
+        downsample='',
+        act_layer='silu',
+    )
+    return cfg
+###############################################################################################
+
 
 model_cfgs = dict(
     mobilevit_xxs=ByoModelCfg(
@@ -133,6 +153,50 @@ model_cfgs = dict(
         act_layer='silu',
         num_features=640,
     ),
+    
+    # Edited ### Proposed Models ##################################################################
+    ae_mobilevit_xxs=ByoModelCfg(
+        blocks=(
+            _mobilevit_block(d=1, c=48, s=2, transformer_dim=64, transformer_depth=2, patch_size=2, br=2.0),
+            _mobilevit_block(d=1, c=64, s=2, transformer_dim=80, transformer_depth=4, patch_size=2, br=2.0),
+            _mobilevit_block(d=1, c=80, s=2, transformer_dim=96, transformer_depth=3, patch_size=2, br=2.0),
+        ),
+        stem_chs=16,
+        stem_type='3x3',
+        stem_pool='',
+        downsample='',
+        act_layer='silu',
+        num_features=320,
+    ),
+
+    ae_mobilevit_xs=ByoModelCfg(
+        blocks=(
+            _mobilevit_block(d=1, c=64, s=2, transformer_dim=96, transformer_depth=2, patch_size=2),
+            _mobilevit_block(d=1, c=80, s=2, transformer_dim=120, transformer_depth=4, patch_size=2),
+            _mobilevit_block(d=1, c=96, s=2, transformer_dim=144, transformer_depth=3, patch_size=2),
+        ),
+        stem_chs=16,
+        stem_type='3x3',
+        stem_pool='',
+        downsample='',
+        act_layer='silu',
+        num_features=384,
+    ),
+    
+    ae_mobilevit_s=ByoModelCfg(
+        blocks=(
+            _mobilevit_block(d=1, c=96, s=2, transformer_dim=144, transformer_depth=2, patch_size=2), # stage 1
+            _mobilevit_block(d=1, c=128, s=2, transformer_dim=192, transformer_depth=4, patch_size=2), # stage 2
+            _mobilevit_block(d=1, c=160, s=2, transformer_dim=240, transformer_depth=3, patch_size=2), # stage 3
+        ),
+        stem_chs=16,
+        stem_type='3x3',
+        stem_pool='',
+        downsample='',
+        act_layer='silu',
+        num_features=640,
+    ),
+    ###############################################################################################
 
     semobilevit_s=ByoModelCfg(
         blocks=(
@@ -158,6 +222,17 @@ model_cfgs = dict(
     mobilevitv2_150=_mobilevitv2_cfg(1.5),
     mobilevitv2_175=_mobilevitv2_cfg(1.75),
     mobilevitv2_200=_mobilevitv2_cfg(2.0),
+    
+    
+    # Edited ### Proposed Models ##################################################################
+    ae_mobilevitv2_050=_ae_mobilevitv2_cfg(.50),
+    ae_mobilevitv2_075=_ae_mobilevitv2_cfg(.75),
+    ae_mobilevitv2_125=_ae_mobilevitv2_cfg(1.25),
+    ae_mobilevitv2_100=_ae_mobilevitv2_cfg(1.0),
+    ae_mobilevitv2_150=_ae_mobilevitv2_cfg(1.5),
+    ae_mobilevitv2_175=_ae_mobilevitv2_cfg(1.75),
+    ae_mobilevitv2_200=_ae_mobilevitv2_cfg(2.0),
+    ###############################################################################################
 )
 
 
@@ -544,17 +619,19 @@ register_block('mobilevit', MobileVitBlock)
 register_block('mobilevit2', MobileVitV2Block)
 
 
-def _create_mobilevit(variant, cfg_variant=None, pretrained=False, **kwargs):
+# Edited ### Proposed Models ##################################################################
+def _create_mobilevit(variant, cfg_variant=None, pretrained=False, proposed=False, 
+                      version='v1', mode='s', type='small', kind='AE', ratio='050', **kwargs):
     return build_model_with_cfg(
-        ByobNet, variant, pretrained,
+        ByobNet, variant, pretrained, proposed=proposed, version=version, mode=mode, type=type, kind=kind, ratio=ratio,
         model_cfg=model_cfgs[variant] if not cfg_variant else model_cfgs[cfg_variant],
         feature_cfg=dict(flatten_sequential=True),
         **kwargs)
+###############################################################################################
 
-
-def _create_mobilevit2(variant, cfg_variant=None, pretrained=False, **kwargs):
+def _create_mobilevit2(variant, cfg_variant=None, pretrained=False, proposed=False, mode='s', **kwargs):
     return build_model_with_cfg(
-        ByobNet, variant, pretrained,
+        ByobNet, variant, pretrained, proposed=proposed, mode=mode,
         model_cfg=model_cfgs[variant] if not cfg_variant else model_cfgs[cfg_variant],
         feature_cfg=dict(flatten_sequential=True),
         **kwargs)
@@ -635,6 +712,69 @@ def mobilevit_s(pretrained=False, **kwargs) -> ByobNet:
     return _create_mobilevit('mobilevit_s', pretrained=pretrained, **kwargs)
 
 
+# Edited ### proposed training #################################################
+@register_model
+def ae_mobilevit_s_small_AE_050(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_s', pretrained=pretrained, proposed=True, version='v1', mode='s', type='small', kind='AE', **kwargs)
+
+@register_model
+def ae_mobilevit_s_large_AE_050(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_s', pretrained=pretrained, proposed=True, version='v1', mode='s', type='large', kind='AE', **kwargs)
+
+@register_model
+def ae_mobilevit_s_inverted_AE_050(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_s', pretrained=pretrained, proposed=True, version='v1', mode='s', type='inverted', kind='AE', **kwargs)
+
+@register_model
+def ae_mobilevit_s_small_DAE_030(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_s', pretrained=pretrained, proposed=True, version='v1', mode='s', type='small', kind='DAE', ratio='030', **kwargs)
+
+@register_model
+def ae_mobilevit_s_large_DAE_030(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_s', pretrained=pretrained, proposed=True, version='v1', mode='s', type='large', kind='DAE', ratio='030', **kwargs)
+
+@register_model
+def ae_mobilevit_s_small_DAE_050(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_s', pretrained=pretrained, proposed=True, version='v1', mode='s', type='small', kind='DAE', **kwargs)
+
+@register_model
+def ae_mobilevit_s_large_DAE_050(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_s', pretrained=pretrained, proposed=True, version='v1', mode='s', type='large', kind='DAE', **kwargs)
+
+@register_model
+def ae_mobilevit_s_small_MAE_075(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_s', pretrained=pretrained, proposed=True, version='v1', mode='s', type='small', kind='MAE', ratio='075', **kwargs)
+
+@register_model
+def ae_mobilevit_s_large_MAE_075(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_s', pretrained=pretrained, proposed=True, version='v1', mode='s', type='large', kind='MAE', ratio='075', **kwargs)
+
+@register_model
+def ae_mobilevit_xs_small(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_xs', pretrained=pretrained, proposed=True, version='v1', mode='xs', type='small', **kwargs)
+
+@register_model
+def ae_mobilevit_xs_large(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_xs', pretrained=pretrained, proposed=True, version='v1', mode='xs', type='large', **kwargs)
+
+@register_model
+def ae_mobilevit_xs_inverted_AE_050(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_xs', pretrained=pretrained, proposed=True, version='v1', mode='xs', type='inverted', kind='AE', **kwargs)
+
+@register_model
+def ae_mobilevit_xxs_small(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_xxs', pretrained=pretrained, proposed=True, version='v1', mode='xxs', type='small', **kwargs)
+
+@register_model
+def ae_mobilevit_xxs_large(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_xxs', pretrained=pretrained, proposed=True, version='v1', mode='xxs', type='large', **kwargs)
+
+@register_model
+def ae_mobilevit_xxs_inverted_AE_050(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevit_xxs', pretrained=pretrained, proposed=True, version='v1', mode='xxs', type='inverted', kind='AE', **kwargs)
+################################################################################
+
+
 @register_model
 def mobilevitv2_050(pretrained=False, **kwargs) -> ByobNet:
     return _create_mobilevit('mobilevitv2_050', pretrained=pretrained, **kwargs)
@@ -668,6 +808,88 @@ def mobilevitv2_175(pretrained=False, **kwargs) -> ByobNet:
 @register_model
 def mobilevitv2_200(pretrained=False, **kwargs) -> ByobNet:
     return _create_mobilevit('mobilevitv2_200', pretrained=pretrained, **kwargs)
+
+
+# Edited ### proposed training #################################################
+@register_model
+def ae_mobilevitv2_050_small(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_050', pretrained=pretrained, proposed=True, version='v2', mode='050', type='small', **kwargs)
+
+
+@register_model
+def ae_mobilevitv2_075_small(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_075', pretrained=pretrained, proposed=True, version='v2', mode='075', type='small', **kwargs)
+
+
+@register_model
+def ae_mobilevitv2_100_small(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_100', pretrained=pretrained, proposed=True, version='v2', mode='100', type='small', **kwargs)
+
+
+@register_model
+def ae_mobilevitv2_125_small(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_125', pretrained=pretrained, proposed=True, version='v2', mode='125', type='small', **kwargs)
+
+
+@register_model
+def ae_mobilevitv2_150_small(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_150', pretrained=pretrained, proposed=True, version='v2', mode='150', type='small', **kwargs)
+
+
+@register_model
+def ae_mobilevitv2_175_small(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_175', pretrained=pretrained, proposed=True, version='v2', mode='175', type='small', **kwargs)
+
+
+@register_model
+def ae_mobilevitv2_200_small(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_200', pretrained=pretrained, proposed=True, version='v2', mode='200', type='small', **kwargs)
+
+@register_model
+def ae_mobilevitv2_050_large(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_050', pretrained=pretrained, proposed=True, version='v2', mode='050', type='large', **kwargs)
+
+
+@register_model
+def ae_mobilevitv2_075_large(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_075', pretrained=pretrained, proposed=True, version='v2', mode='075', type='large', **kwargs)
+
+
+@register_model
+def ae_mobilevitv2_100_large(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_100', pretrained=pretrained, proposed=True, version='v2', mode='100', type='large', **kwargs)
+
+
+@register_model
+def ae_mobilevitv2_125_large(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_125', pretrained=pretrained, proposed=True, version='v2', mode='125', type='large', **kwargs)
+
+
+@register_model
+def ae_mobilevitv2_150_large(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_150', pretrained=pretrained, proposed=True, version='v2', mode='150', type='large', **kwargs)
+
+
+@register_model
+def ae_mobilevitv2_175_large(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_175', pretrained=pretrained, proposed=True, version='v2', mode='175', type='large', **kwargs)
+
+@register_model
+def ae_mobilevitv2_200_large(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_200', pretrained=pretrained, proposed=True, version='v2', mode='200', type='large', **kwargs)
+
+@register_model
+def ae_mobilevitv2_200_small_AE_050(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_200', pretrained=pretrained, proposed=True, version='v2', mode='200', type='small', kind='AE', **kwargs)
+
+@register_model
+def ae_mobilevitv2_200_large_AE_050(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_200', pretrained=pretrained, proposed=True, version='v2', mode='200', type='large', kind='AE', **kwargs)
+
+@register_model
+def ae_mobilevitv2_200_inverted_AE_050(pretrained=False, **kwargs) -> ByobNet:
+    return _create_mobilevit('ae_mobilevitv2_200', pretrained=pretrained, proposed=True, version='v2', mode='200', type='inverted', kind='AE', **kwargs)
+################################################################################
 
 
 register_model_deprecations(__name__, {

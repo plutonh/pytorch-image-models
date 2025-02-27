@@ -48,7 +48,7 @@ _logger = logging.getLogger('validate')
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Validation')
 parser.add_argument('data', nargs='?', metavar='DIR', const=None,
                     help='path to dataset (*deprecated*, use --data-dir)')
-parser.add_argument('--data-dir', metavar='DIR',
+parser.add_argument('--data-dir', metavar='DIR', default='/project/hw-team/dataset/ImageNet/val',
                     help='path to dataset (root dir)')
 parser.add_argument('--dataset', metavar='NAME', default='',
                     help='dataset type + name ("<type>/<name>") (default: ImageFolder or ImageTar if empty)')
@@ -216,6 +216,9 @@ def validate(args):
         scriptable=args.torchscript,
         **args.model_kwargs,
     )
+    
+    print(model)
+    
     if args.num_classes is None:
         assert hasattr(model, 'num_classes'), 'Model must have `num_classes` attr if not set on cmd line/config.'
         args.num_classes = model.num_classes
@@ -412,7 +415,6 @@ def _try_run(args, initial_batch_size):
                 break
         batch_size = decay_batch_step(batch_size)
         _logger.warning(f'Reducing batch size to {batch_size} for retry.')
-    results['model'] = args.model
     results['error'] = error_str
     _logger.error(f'{args.model} failed to validate ({error_str}).')
     return results

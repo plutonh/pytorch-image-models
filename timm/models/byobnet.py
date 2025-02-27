@@ -35,6 +35,7 @@ from typing import Tuple, List, Dict, Optional, Union, Any, Callable, Sequence
 
 import torch
 import torch.nn as nn
+import numpy as np
 
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, OPENAI_CLIP_MEAN, OPENAI_CLIP_STD
 from timm.layers import (
@@ -922,6 +923,106 @@ def create_block(block: Union[str, nn.Module], **kwargs):
     return _block_registry[block](**kwargs)
 
 
+# Edited ### ConvEncoder Classes ############################################################################
+class ConvEncoder_S(nn.Module):
+    def __init__(self, channels):
+        super(ConvEncoder_S, self).__init__()
+        
+        self.mid_channel = int(channels[2] / 2)
+        self.encoder = nn.Sequential(
+            nn.Conv2d(in_channels=channels[0], out_channels=self.mid_channel, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=self.mid_channel, out_channels=channels[2], kernel_size=3, stride=1, padding=1, bias=True),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        encoded = self.encoder(x)
+        return encoded
+
+class ConvEncoder_L(nn.Module):
+    def __init__(self, channels):
+        super(ConvEncoder_L, self).__init__()
+
+        self.mid_channel = int(channels[2] / 2)
+        self.encoder = nn.Sequential(
+            nn.Conv2d(in_channels=channels[0], out_channels=self.mid_channel, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.ReLU(inplace=True),
+            
+            nn.Conv2d(in_channels=self.mid_channel, out_channels=self.mid_channel, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=channels[1], out_channels=channels[2], kernel_size=3, stride=1, padding=1, bias=True),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        encoded = self.encoder(x)
+        return encoded
+    
+
+class ConvEncoder_I(nn.Module):
+    def __init__(self, channels):
+        super(ConvEncoder_I, self).__init__()
+        
+        self.mid_channel = int(channels[1] + channels[2])
+        self.encoder = nn.Sequential(
+            nn.Conv2d(in_channels=channels[0], out_channels=self.mid_channel, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=self.mid_channel, out_channels=channels[2], kernel_size=3, stride=1, padding=1, bias=True),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        encoded = self.encoder(x)
+        return encoded
+    
+# class ConvEncoder_S(nn.Module):
+#     def __init__(self, channels):
+#         super(ConvEncoder_S, self).__init__()
+        
+#         self.encoder = nn.Sequential(
+#             nn.Conv2d(channels[0], channels[1], kernel_size=3, stride=1, padding=1, bias=True),
+#             nn.BatchNorm2d(channels[1]),
+#             nn.ReLU(inplace=True),
+#             nn.MaxPool2d(kernel_size=2, stride=2),
+            
+#             nn.Conv2d(channels[1], channels[2], kernel_size=3, stride=1, padding=1, bias=True),
+#             nn.BatchNorm2d(channels[2]),
+#             nn.ReLU(inplace=True)
+#         )
+
+#     def forward(self, x):
+#         return self.encoder(x)
+
+# class ConvEncoder_L(nn.Module):
+#     def __init__(self, channels):
+#         super(ConvEncoder_L, self).__init__()
+        
+#         self.encoder = nn.Sequential(
+#             nn.Conv2d(channels[0], channels[1], kernel_size=3, stride=1, padding=1, bias=True),
+#             nn.BatchNorm2d(channels[1]),
+#             nn.ReLU(inplace=True),
+            
+#             nn.Conv2d(channels[1], channels[1], kernel_size=3, stride=1, padding=1, bias=True),
+#             nn.BatchNorm2d(channels[1]),
+#             nn.ReLU(inplace=True),
+#             nn.MaxPool2d(kernel_size=2, stride=2),
+            
+#             nn.Conv2d(channels[1], channels[2], kernel_size=3, stride=1, padding=1, bias=True),
+#             nn.BatchNorm2d(channels[2]),
+#             nn.ReLU(inplace=True)
+#         )
+
+#     def forward(self, x):
+#         return self.encoder(x)
+#############################################################################################################
+
 class Stem(nn.Sequential):
 
     def __init__(
@@ -1007,6 +1108,12 @@ def create_byob_stem(
         pool_type: str = '',
         feat_prefix: str = 'stem',
         layers: LayerFn = None,
+        
+        # Edited ### proposed training configuration #################
+        proposed: bool = False,
+        version: str = 'v1',
+        mode: str = 's',
+        ##############################################################
 ):
     layers = layers or LayerFn()
     assert stem_type in ('', 'quad', 'quad2', 'tiered', 'deep', 'rep', 'one', '7x7', '3x3')
@@ -1039,6 +1146,19 @@ def create_byob_stem(
                 stem = Stem(in_chs, out_chs, 3, num_rep=1, pool=pool_type, layers=layers)
             else:
                 stem = layers.conv_norm_act(in_chs, out_chs, 3, stride=2)
+
+        ### Edited ### 3x3 stem conv with pretrained weights ######################################
+        if proposed: 
+            # Load stem weights and modify keys from 'stem.' to 'conv.'
+            stem_pretrained = torch.load(f"/home/jhnam/Research/MobileViT/pretrained_model/mobilevit_{version}_{mode}.pt", map_location="cpu", weights_only=True)
+            stem_weights = {k.replace("stem.", ""): v for k, v in stem_pretrained.items() if k.startswith("stem.")}
+            missing, unexpected = stem.load_state_dict(stem_weights, strict=False)
+            print("stem Missing keys:", missing)
+            print("stem Unexpected keys:", unexpected)
+            for param in stem.parameters():
+                param.requires_grad = False
+            print("conv weights have been loaded from stem and gradients disabled.")
+        ###########################################################################################    
 
     if isinstance(stem, Stem):
         feature_info = [dict(f, module='.'.join([feat_prefix, f['module']])) for f in stem.feature_info]
@@ -1104,6 +1224,16 @@ def create_byob_stages(
         drop_path_rate: float,
         output_stride: int,
         stem_feat: Dict[str, Any],
+        
+        # Edited ### proposed training configuration #################
+        proposed: bool = False,
+        version: str = 'v1',
+        mode: str = 's',
+        type: str = 'small',
+        kind: str = 'AE',
+        ratio: str = '050',
+        ##############################################################
+        
         feat_size: Optional[int] = None,
         layers: Optional[LayerFn] = None,
         block_kwargs_fn: Optional[Callable] = update_block_kwargs,
@@ -1119,7 +1249,67 @@ def create_byob_stages(
     prev_chs = stem_feat['num_chs']
     prev_feat = stem_feat
     stages = []
-    for stage_idx, stage_block_cfgs in enumerate(block_cfgs):
+    
+    # Edited ### Autoencoder channel config ############################
+    ae_channel_cfg = {
+        # MobileViT v1
+        "xxs": {"channels": [16, 16, 24]},
+        "xs":  {"channels": [16, 32, 48]},
+        "s":   {"channels": [16, 32, 64]},
+        # MobileViT v2
+        "050": {"channels": [int(32 * 0.5),  int(64 * 0.5),  int(128 * 0.5)]},
+        "075": {"channels": [int(32 * 0.75), int(64 * 0.75), int(128 * 0.75)]},
+        "100": {"channels": [int(32 * 1.0),  int(64 * 1.0),  int(128 * 1.0)]},
+        "125": {"channels": [int(32 * 1.25), int(64 * 1.25), int(128 * 1.25)]},
+        "150": {"channels": [int(32 * 1.5),  int(64 * 1.5),  int(128 * 1.5)]},
+        "175": {"channels": [int(32 * 1.75), int(64 * 1.75), int(128 * 1.75)]},
+        "200": {"channels": [int(32 * 2.0),  int(64 * 2.0),  int(128 * 2.0)]},
+    }
+    ae_cfg = ae_channel_cfg[mode]
+    ####################################################################
+    
+    # Edited ### Replace stage 0 with ConvEncoder ####################################################################
+    if proposed:
+        if type == "small":
+            encoder = ConvEncoder_S(ae_cfg["channels"])
+        elif type == "large":
+            encoder = ConvEncoder_L(ae_cfg["channels"])
+        elif type == "inverted":
+            encoder = ConvEncoder_I(ae_cfg["channels"])
+
+        if type == "small" or type == "large":
+            # Load encoder weights and modify keys
+            encoder_pretrained = torch.load(f"/home/jhnam/Research/MobileViT/trained_ae/ae_best_weights_{version}_{mode}_{type}_{kind}_{ratio}.pt", map_location="cpu", weights_only=True)
+            encoder_weights = {}
+            for k, v in encoder_pretrained.items():
+                if type == "small":
+                    if k.startswith("module.stages.0.0.encoder.0") or k.startswith("module.stages.0.0.encoder.3"):
+                        splitted = k.split(".")
+                        new_key = ".".join(splitted[4:])
+                        encoder_weights[new_key] = v
+                else:
+                    if k.startswith("module.stages.0.0.encoder.0") or k.startswith("module.stages.0.0.encoder.2") or k.startswith("module.stages.0.0.encoder.5"):
+                        splitted = k.split(".")
+                        new_key = ".".join(splitted[4:])
+                        encoder_weights[new_key] = v
+
+            missing, unexpected = encoder.load_state_dict(encoder_weights, strict=False)
+            print("stage0 Missing keys:", missing)
+            print("stage0 Unexpected keys:", unexpected)
+
+            for param in encoder.parameters():
+                param.requires_grad = False
+
+            print("Encoder weights loaded from module.stages.0.0.encoder.* and gradients disabled.")
+        
+        prev_chs = ae_cfg["channels"][-1]
+        net_stride *= 2
+        stage_idx = 0
+        stages += [nn.Sequential(encoder)]
+        prev_feat = dict(num_chs=prev_chs, reduction=net_stride, module=f'stages.{stage_idx}', stage=stage_idx + 1)
+    ##################################################################################################################
+        
+    for stage_idx, stage_block_cfgs in enumerate(block_cfgs):        
         stride = stage_block_cfgs[0].s
         if stride != 1 and prev_feat:
             feature_info.append(prev_feat)
@@ -1130,6 +1320,7 @@ def create_byob_stages(
         first_dilation = 1 if dilation in (1, 2) else 2
 
         blocks = []
+ 
         for block_idx, block_cfg in enumerate(stage_block_cfgs):
             out_chs = make_divisible(block_cfg.c * cfg.width_factor)
             group_size = block_cfg.gs
@@ -1155,9 +1346,15 @@ def create_byob_stages(
             prev_chs = out_chs
             if stride > 1 and block_idx == 0:
                 feat_size = reduce_feat_size(feat_size, stride)
-
+        
         stages += [nn.Sequential(*blocks)]
-        prev_feat = dict(num_chs=prev_chs, reduction=net_stride, module=f'stages.{stage_idx}', stage=stage_idx + 1)
+        
+        # Edited ### stage_idx correction ###############################################################################
+        if proposed:
+            prev_feat = dict(num_chs=prev_chs, reduction=net_stride, module=f'stages.{stage_idx + 1}', stage=stage_idx + 2)
+        else:
+            prev_feat = dict(num_chs=prev_chs, reduction=net_stride, module=f'stages.{stage_idx}', stage=stage_idx + 1)
+        #################################################################################################################
 
     feature_info.append(prev_feat)
     return nn.Sequential(*stages), feature_info, feat_size
@@ -1187,6 +1384,16 @@ class ByobNet(nn.Module):
     def __init__(
             self,
             cfg: ByoModelCfg,
+            
+            # Edited ### proposed training configuration #################
+            proposed: bool = False,
+            version: str = 'v1',
+            mode: str = "s",
+            type: str = "small",
+            kind: str = 'AE',
+            ratio: str = '050',
+            ##############################################################
+            
             num_classes: int = 1000,
             in_chans: int = 3,
             global_pool: Optional[str] = None,
@@ -1233,6 +1440,12 @@ class ByobNet(nn.Module):
             stem_type=cfg.stem_type,
             pool_type=cfg.stem_pool,
             layers=stem_layers,
+            
+            # Edited ### proposed training configuration #################
+            proposed=proposed,
+            version=version,
+            mode=mode,
+            ##############################################################
         )
         self.feature_info.extend(stem_feat[:-1])
         feat_size = reduce_feat_size(feat_size, stride=stem_feat[-1]['reduction'])
@@ -1242,6 +1455,16 @@ class ByobNet(nn.Module):
             drop_path_rate,
             output_stride,
             stem_feat[-1],
+            
+            # Edited ### proposed training configuration #################
+            proposed=proposed,
+            version=version,
+            mode=mode,
+            type=type,
+            kind=kind,
+            ratio=ratio,
+            ##############################################################
+            
             layers=stage_layers,
             feat_size=feat_size,
         )

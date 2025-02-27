@@ -81,7 +81,7 @@ group = parser.add_argument_group('Dataset parameters')
 # Keep this argument outside the dataset group because it is positional.
 parser.add_argument('data', nargs='?', metavar='DIR', const=None,
                     help='path to dataset (positional is *deprecated*, use --data-dir)')
-group.add_argument('--data-dir', metavar='DIR',
+group.add_argument('--data-dir', metavar='DIR', default='/project/hw-team/dataset/ImageNet',
                     help='path to dataset (root dir)')
 group.add_argument('--dataset', metavar='NAME', default='',
                     help='dataset type + name ("<type>/<name>") (default: ImageFolder or ImageTar if empty)')
