@@ -911,9 +911,6 @@ def ae_mobilevitv2_200_large(pretrained=False, **kwargs) -> ByobNet:
 def ae_mobilevitv2_200_large_AE_050(pretrained=False, **kwargs) -> ByobNet:
     return _create_mobilevit('ae_mobilevitv2_200', pretrained=pretrained, proposed=True, version='v2', mode='200', type='large', kind='AE', **kwargs)
 
-@register_model
-def ae_mobilevitv2_200_inverted_AE_050(pretrained=False, **kwargs) -> ByobNet:
-    return _create_mobilevit('ae_mobilevitv2_200', pretrained=pretrained, proposed=True, version='v2', mode='200', type='inverted', kind='AE', **kwargs)
 ################################################################################
 
 

@@ -1238,31 +1238,31 @@ def create_byob_stages(
         elif type == "inverted":
             encoder = ConvEncoder_I(ae_cfg["channels"])
 
-        # if type == "small" or type == "large":
-        #     # Load encoder weights and modify keys
-        #     # encoder_pretrained = torch.load(f"/home/jhnam/Research/MobileViT/trained_ae/ae_best_weights_{version}_{mode}_{type}_{kind}_{ratio}_loss_old.pt", map_location="cpu", weights_only=True)
-        #     encoder_pretrained = torch.load(f"/home/jhnam/Research/MobileViT/trained_ae/mv2_best_weights_v1_s.pt", map_location="cpu", weights_only=True)
-        #     encoder_weights = {}
-        #     for k, v in encoder_pretrained.items():
-        #         if type == "small":
-        #             if k.startswith("module.stages.0.0.encoder.0") or k.startswith("module.stages.0.0.encoder.3"):
-        #                 splitted = k.split(".")
-        #                 new_key = ".".join(splitted[4:])
-        #                 encoder_weights[new_key] = v
-        #         else:
-        #             if k.startswith("module.stages.0.0.encoder.0") or k.startswith("module.stages.0.0.encoder.2") or k.startswith("module.stages.0.0.encoder.5"):
-        #                 splitted = k.split(".")
-        #                 new_key = ".".join(splitted[4:])
-        #                 encoder_weights[new_key] = v
+        if type == "small" or type == "large":
+            # Load encoder weights and modify keys
+            encoder_pretrained = torch.load(f"/home/jhnam/Research/MobileViT/trained_ae/ae_best_weights_{version}_{mode}_{type}_{kind}_{ratio}_v3_old.pt", map_location="cpu", weights_only=True)
+            # encoder_pretrained = torch.load(f"/home/jhnam/Research/MobileViT/trained_ae/mv2_best_weights_v1_s.pt", map_location="cpu", weights_only=True)
+            encoder_weights = {}
+            for k, v in encoder_pretrained.items():
+                if type == "small":
+                    if k.startswith("module.stages.0.0.encoder.0") or k.startswith("module.stages.0.0.encoder.3"):
+                        splitted = k.split(".")
+                        new_key = ".".join(splitted[4:])
+                        encoder_weights[new_key] = v
+                else:
+                    if k.startswith("module.stages.0.0.encoder.0") or k.startswith("module.stages.0.0.encoder.2") or k.startswith("module.stages.0.0.encoder.5"):
+                        splitted = k.split(".")
+                        new_key = ".".join(splitted[4:])
+                        encoder_weights[new_key] = v
 
-        #     missing, unexpected = encoder.load_state_dict(encoder_weights, strict=False)
-        #     print("stage0 Missing keys:", missing)
-        #     print("stage0 Unexpected keys:", unexpected)
+            missing, unexpected = encoder.load_state_dict(encoder_weights, strict=False)
+            print("stage0 Missing keys:", missing)
+            print("stage0 Unexpected keys:", unexpected)
 
-        #     for param in encoder.parameters():
-        #         param.requires_grad = False
+            for param in encoder.parameters():
+                param.requires_grad = False
 
-        #     print("Encoder weights loaded from module.stages.0.0.encoder.* and gradients disabled.")
+            print("Encoder weights loaded from module.stages.0.0.encoder.* and gradients disabled.")
         
         prev_chs = ae_cfg["channels"][-1]
         net_stride *= 2

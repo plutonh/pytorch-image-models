@@ -48,7 +48,7 @@ _logger = logging.getLogger('validate')
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Validation')
 parser.add_argument('data', nargs='?', metavar='DIR', const=None,
                     help='path to dataset (*deprecated*, use --data-dir)')
-parser.add_argument('--data-dir', metavar='DIR', default='/project/hw-team/dataset/ImageNet/val',
+parser.add_argument('--data-dir', metavar='DIR', default='~/Dataset/ImageNet',
                     help='path to dataset (root dir)')
 parser.add_argument('--dataset', metavar='NAME', default='',
                     help='dataset type + name ("<type>/<name>") (default: ImageFolder or ImageTar if empty)')
